@@ -23,20 +23,29 @@
 const path = require('path');
 
 const {default: axios} = require('axios');
+const commander = require('commander');
 const fs = require('fs-extra');
 
-const {checkEnvVars, execAsync} = require('./utils');
+const {execAsync} = require('./utils');
 
-checkEnvVars(['WRAPPER_BUILD', 'GITHUB_ACCESS_TOKEN']);
+commander
+  .name('github-draft.js')
+  .description('Create a release draft on GitHub')
+  .option('-t, --github-token <token>', 'Specify the GitHub access token')
+  .option('-w, --wrapper-build <build>', 'Specify the wrapper build (e.g. "Linux#3.7.1234")')
+  .option('-p, --path <path>', 'Specify the local path to look for files (e.g. "../../wrap")')
+  .parse(process.argv);
 
-const WRAPPER_BUILD = process.env.WRAPPER_BUILD.toLowerCase();
-const VERSION = process.env.WRAPPER_BUILD.split('#')[1];
-const GITHUB_ACCESS_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
-const DRAFT_RESOURCE = `https://api.github.com/repos/wireapp/wire-desktop/releases`;
+if (!commander.githubToken || !commander.wrapperBuild || !commander.wrapperBuild.includes('#')) {
+  commander.outputHelp();
+  process.exit(1);
+}
 
 const AuthorizationHeaders = {
-  Authorization: `token ${GITHUB_ACCESS_TOKEN}`,
+  Authorization: `token ${commander.githubToken}`,
 };
+
+const draftUrl = `https://api.github.com/repos/wireapp/wire-desktop/releases`;
 
 /**
  * @param {string[]} suffixes
@@ -64,7 +73,7 @@ async function createDraft(options) {
   console.log(draftData);
 
   try {
-    const draftResponse = await axios.post(DRAFT_RESOURCE, draftData, {headers: AuthorizationHeaders});
+    const draftResponse = await axios.post(draftUrl, draftData, {headers: AuthorizationHeaders});
     console.log('Draft created.');
     return draftResponse;
   } catch (error) {
@@ -117,36 +126,40 @@ async function uploadAsset(options) {
   try {
     let PLATFORM;
 
-    if (WRAPPER_BUILD.toLowerCase().includes('linux')) {
+    const [platform, version] = commander.wrapperBuild.toLowerCase().split('#');
+    const basePath = commander.path || path.resolve('.');
+
+    if (platform === 'linux') {
       PLATFORM = 'Linux';
-    } else if (WRAPPER_BUILD.toLowerCase().includes('windows')) {
+    } else if (platform === 'windows') {
       PLATFORM = 'Windows';
-    } else if (WRAPPER_BUILD.toLowerCase().includes('macos')) {
+    } else if (platform === 'macos') {
       PLATFORM = 'macOS';
+    } else {
+      throw new Error('Invalid platform');
     }
 
     const commitish = await execAsync('git rev-parse HEAD');
-    const CWD = process.cwd();
 
     const changelog = '...';
 
     const draftResponse = await createDraft({
       changelog,
       commitish,
-      tagName: `${PLATFORM.toLowerCase()}/${VERSION}`,
-      title: `${VERSION} - ${PLATFORM}`,
+      tagName: `${platform}/${version}`,
+      title: `${version} - ${PLATFORM}`,
     });
 
     const {upload_url, url: fullDraftUrl} = draftResponse.data;
     const uploadUrl = upload_url.split('{')[0];
 
-    const files = await fs.readdir(CWD);
+    const files = await fs.readdir(basePath);
 
     await Promise.all(
       files
         .filter(fileName => endsWithAny(['.asc', '.sig', '.AppImage', '.deb', '.exe', '.pkg'], fileName))
         .map(fileName => {
-          const resolvedPath = path.join(CWD, fileName);
+          const resolvedPath = path.join(basePath, fileName);
           return uploadAsset({fileName, filePath: resolvedPath, fullDraftUrl, uploadUrl});
         })
     );

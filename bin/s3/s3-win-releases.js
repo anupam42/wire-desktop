@@ -47,7 +47,7 @@ if (!commander.bucket || !commander.wrapperBuild || !commander.wrapperBuild.incl
   }
 
   const bucket = commander.bucket;
-  const searchBasePath = commander.path || path.join(__dirname, '../../wrap');
+  const searchBasePath = commander.path || path.resolve('.');
   const s3BasePath = `${commander.s3path || ''}/`.replace('//', '/');
 
   const nupkgFile = await findDown('-full.nupkg', {cwd: searchBasePath});

@@ -41,15 +41,32 @@ if (!commander.hockeyToken || !commander.hockeyId || !commander.wrapperBuild || 
   process.exit(1);
 }
 
-const {hockeyId, hockeyToken, wrapperBuild} = commander;
-const version = wrapperBuild.toLowerCase().split('#')[1];
-const searchBasePath = commander.path || path.join(__dirname, '../../wrap');
+/**
+ * @param {string} platform
+ * @param {string} basePath
+ */
+async function getUploadFile(platform, basePath) {
+  if (platform === 'linux') {
+    const debImage = await findDown('.deb', {cwd: basePath});
+    return debImage;
+  } else if (platform === 'windows') {
+    const setupExe = await findDown('-Setup.exe', {cwd: basePath});
+    return setupExe;
+  } else if (platform === 'macos') {
+    const setupPkg = await findDown('.pkg', {cwd: basePath});
+    return setupPkg;
+  }
+}
 
 (async () => {
   try {
-    const appExe = await findDown('-Setup.exe', searchBasePath);
+    const {hockeyId, hockeyToken, wrapperBuild} = commander;
+    const [platform, version] = wrapperBuild.toLowerCase().split('#');
+    const searchBasePath = commander.path || path.resolve('.');
 
-    const zipFile = await zip(appExe.filePath, appExe.filePath.replace('.exe', '.zip'));
+    const {filePath} = await getUploadFile(platform, searchBasePath);
+
+    const zipFile = await zip(filePath, filePath.replace('.exe', '.zip'));
 
     const {id: hockeyVersionId} = await createVersion({
       hockeyAppId: hockeyId,
