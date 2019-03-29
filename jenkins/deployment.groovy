@@ -75,7 +75,7 @@ node('master') {
                 sh 'node ./bin/hockey/win-prod-hockey.js'
               }
             } else if (params.Release.equals('Custom')) {
-              withCredentials([string(credentialsId: "${params.WIN_CUSTOM_HOCKEY_ID}", variable: 'WIN_CUSTOM_HOCKEY_ID'), string(credentialsId: "${params.WIN_CUSTOM_HOCKEY_TOKEN}", variable: 'WIN_CUSTOM_HOCKEY_TOKEN')]) {
+              withCredentials([string(credentialsId: "${WIN_CUSTOM_HOCKEY_ID}", variable: 'WIN_CUSTOM_HOCKEY_ID'), string(credentialsId: "${WIN_CUSTOM_HOCKEY_TOKEN}", variable: 'WIN_CUSTOM_HOCKEY_TOKEN')]) {
                 sh 'node ./bin/hockey/win-custom-hockey.js'
               }
             } else {
@@ -93,15 +93,15 @@ node('master') {
             withEnv(['BUCKET=wire-taco']) {
               if (params.Release.equals('Production')) {
                 withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  sh 'node ./bin/s3/win-prod-s3.js'
+                  sh "node ./bin/s3/s3.js -b ${BUCKET} -s Windows -p win/prod -w ${WRAPPER_BUILD}"
                 }
               } else if (params.Release.equals('Custom')) {
-                withCredentials([string(credentialsId: "${params.AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${params.AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  sh 'node ./bin/s3/win-custom-s3.js'
+                withCredentials([string(credentialsId: "${AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                  sh "node ./bin/s3/s3.js -b ${WIN_S3_BUCKET} -s Windows -p ${WIN_S3_PATH} -w ${WRAPPER_BUILD}"
                 }
               } else {
                 withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  sh 'node ./bin/s3/win-internal-s3.js'
+                  sh "node ./bin/s3/s3.js -b ${BUCKET} -s Windows -p win/internal -w ${WRAPPER_BUILD}"
                 }
               }
             }
@@ -118,7 +118,7 @@ node('master') {
               sh './bin/hockey/macos-prod-hockey.sh'
             }
           } else if (params.Release.equals('Custom')) {
-            withCredentials([string(credentialsId: "${params.MACOS_CUSTOM_HOCKEY_ID}", variable: 'MACOS_CUSTOM_HOCKEY_ID'), string(credentialsId: "${params.MACOS_CUSTOM_HOCKEY_TOKEN}", variable: 'MACOS_CUSTOM_HOCKEY_TOKEN')]) {
+            withCredentials([string(credentialsId: "${MACOS_CUSTOM_HOCKEY_ID}", variable: 'MACOS_CUSTOM_HOCKEY_ID'), string(credentialsId: "${MACOS_CUSTOM_HOCKEY_TOKEN}", variable: 'MACOS_CUSTOM_HOCKEY_TOKEN')]) {
               sh 'node ./bin/hockey/macos-custom-hockey.js'
             }
           } else {
@@ -136,7 +136,7 @@ node('master') {
           if (params.Release.equals('Production')) {
             withEnv(['BUCKET=wire-taco']) {
               withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                sh 'node ./bin/s3/linux-prod-s3.js'
+                sh "node ./bin/s3/s3.js -b ${BUCKET} -s Linux -p linux -w ${WRAPPER_BUILD}"
               }
             }
           } else if (params.Release.equals('Custom')) {
@@ -161,15 +161,15 @@ node('master') {
         withEnv(['BUCKET=wire-taco', "PATH+NODE=${NODE}/bin"]) {
           if (params.Release.equals('Production')) {
             withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh 'node ./bin/s3/win-prod-s3-deploy.js'
+              sh "node ./bin/s3/s3-releases.js -b ${BUCKET} -s Windows -p win/prod -w ${WRAPPER_BUILD}"
             }
           } else if (params.Release.equals('Custom')) {
-            withCredentials([string(credentialsId: "${params.AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${params.AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh 'node ./bin/s3/win-custom-s3-deploy.js'
+            withCredentials([string(credentialsId: "${AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
+              sh "node ./bin/s3/s3-releases.js -b ${WIN_S3_BUCKET} -s Windows -p ${WIN_S3_PATH} -w ${WRAPPER_BUILD}"
             }
           } else {
             withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh 'node ./bin/s3/win-internal-s3-deploy.js'
+              sh "node ./bin/s3/s3-releases.js -b ${BUCKET} -s Windows -p win/internal -w ${WRAPPER_BUILD}"
             }
           }
         }

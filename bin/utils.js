@@ -33,12 +33,19 @@ function checkEnvVars(envVars) {
 }
 
 /**
- * @param {string} [cwd]
+ * @typedef {{cwd?: string; safeGuard?: boolean}} FindOptions
+ * @typedef {{fileName: string; filePath: string}} FindResult
  * @param {string} fileName
- * @returns {Promise<string | null>}
+ * @param {FindOptions} [options]
+ * @returns {Promise<FindResult|Partial<FindResult>>}
  */
-async function findDown(fileName, cwd = '.') {
-  const resolvedPath = path.resolve(cwd);
+async function findDown(fileName, options) {
+  options = {
+    cwd: '.',
+    safeGuard: true,
+    ...options,
+  };
+  const resolvedPath = path.resolve(options.cwd);
   const currentFiles = [];
   const currentDirs = [];
   const dirContent = (await fs.readdir(resolvedPath)).sort();
@@ -57,18 +64,22 @@ async function findDown(fileName, cwd = '.') {
 
   for (const currentFile of currentFiles) {
     if (currentFile.endsWith(fileName)) {
-      return currentFile;
+      return {fileName: path.basename(currentFile), filePath: currentFile};
     }
   }
 
   for (const currentDir of currentDirs) {
-    const directoryResult = await findDown(fileName, currentDir);
+    const directoryResult = await findDown(fileName, {cwd: currentDir});
     if (directoryResult) {
       return directoryResult;
     }
   }
 
-  return null;
+  if (options.safeGuard) {
+    throw new Error(`Could not find "${fileName}".`);
+  }
+
+  return {};
 }
 
 /** @param {string} command */
