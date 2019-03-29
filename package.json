@@ -16,6 +16,7 @@
     "@babel/preset-env": "7.4.2",
     "@babel/preset-react": "7.0.0",
     "@wireapp/copy-config": "0.5.2",
+    "aws-sdk": "2.428.0",
     "babel-core": "7.0.0-bridge.0",
     "babel-eslint": "10.0.1",
     "babel-jest": "24.5.0",
@@ -56,6 +57,10 @@
   "lint-staged": {
     "*.{js,jsx}": [
       "eslint --fix",
+      "git add"
+    ],
+    "./bin/*.js": [
+      "tsc --allowJs --noEmit",
       "git add"
     ],
     "*.ts": [

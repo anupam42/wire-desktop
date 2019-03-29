@@ -23,21 +23,19 @@ Production
 Custom (needs special env variables)
 */
 node('master') {
-
-  def jenkinsbot_secret = ""
+  def jenkinsbot_secret = ''
   withCredentials([string(credentialsId: 'JENKINSBOT_WRAPPER_CHAT', variable: 'JENKINSBOT_SECRET')]) {
     jenkinsbot_secret = env.JENKINSBOT_SECRET
   }
 
   stage('Checkout & Clean') {
     git branch: "${GIT_BRANCH}", url: 'https://github.com/wireapp/wire-desktop.git'
-    sh returnStatus: true, script: 'rm -rf wrap/'
-    sh returnStatus: true, script: 'rm -rf info.json'
-    sh returnStatus: true, script: 'rm -rf *.pkg'
+    sh returnStatus: true, script: 'rm -rf wrap/ info.json *.pkg'
   }
 
   def projectName = env.WRAPPER_BUILD.tokenize('#')[0]
   def version = env.WRAPPER_BUILD.tokenize('#')[1]
+  def NODE = tool name: 'node-v10.15.3', type: 'nodejs'
 
   stage('Get build artifacts') {
     try {
@@ -53,21 +51,79 @@ node('master') {
 
   currentBuild.displayName = "Deploy $projectName " + version
 
+  stage('Install dependencies') {
+    try {
+      withEnv(["PATH+NODE=${NODE}/bin"]) {
+        sh 'node -v'
+        sh 'npm -v'
+        sh 'npm install -g yarn'
+        sh 'yarn --ignore-scripts'
+      }
+    } catch (e) {
+      wireSend secret: "$jenkinsbot_secret", message: "**Could not get build artifacts from of ${version} from ${projectName}** see: ${JOB_URL}"
+      throw e
+    }
+  }
+
   stage('Upload to S3 and/or Hockey') {
-    if (projectName.contains('Windows')) {
-      parallel hockey: {
+    withEnv(["PATH+NODE=${NODE}/bin"]) {
+      if (projectName.contains('Windows')) {
+        parallel hockey: {
+          try {
+            if (params.Release.equals('Production')) {
+              withCredentials([string(credentialsId: 'WIN_PROD_HOCKEY_TOKEN', variable: 'WIN_PROD_HOCKEY_TOKEN'), string(credentialsId: 'WIN_PROD_HOCKEY_ID', variable: 'WIN_PROD_HOCKEY_ID')]) {
+                sh 'node ./bin/hockey/win-prod-hockey.js'
+              }
+            } else if (params.Release.equals('Custom')) {
+              withCredentials([string(credentialsId: "${params.WIN_CUSTOM_HOCKEY_ID}", variable: 'WIN_CUSTOM_HOCKEY_ID'), string(credentialsId: "${params.WIN_CUSTOM_HOCKEY_TOKEN}", variable: 'WIN_CUSTOM_HOCKEY_TOKEN')]) {
+                sh 'node ./bin/hockey/win-custom-hockey.js'
+              }
+            } else {
+              withCredentials([string(credentialsId: 'WIN_HOCKEY_TOKEN', variable: 'WIN_HOCKEY_TOKEN'), string(credentialsId: 'WIN_HOCKEY_ID', variable: 'WIN_HOCKEY_ID')]) {
+                sh 'node ./bin/hockey/win-internal-hockey.js'
+              }
+            }
+          } catch(e) {
+            currentBuild.result = 'FAILED'
+            wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
+            throw e
+          }
+        }, s3: {
+          try {
+            withEnv(['BUCKET=wire-taco']) {
+              if (params.Release.equals('Production')) {
+                withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                  sh 'node ./bin/s3/win-prod-s3.js'
+                }
+              } else if (params.Release.equals('Custom')) {
+                withCredentials([string(credentialsId: "${params.AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${params.AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                  sh 'node ./bin/s3/win-custom-s3.js'
+                }
+              } else {
+                withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                  sh 'node ./bin/s3/win-internal-s3.js'
+                }
+              }
+            }
+          } catch(e) {
+            currentBuild.result = 'FAILED'
+            wireSend secret: "$jenkinsbot_secret", message: "**Deploying to S3 failed for ${version}** see: ${JOB_URL}"
+            throw e
+          }
+        }, failFast: true
+      } else if (projectName.contains('macOS')) {
         try {
           if (params.Release.equals('Production')) {
-            withCredentials([string(credentialsId: 'WIN_PROD_HOCKEY_TOKEN', variable: 'WIN_PROD_HOCKEY_TOKEN'), string(credentialsId: 'WIN_PROD_HOCKEY_ID', variable: 'WIN_PROD_HOCKEY_ID')]) {
-              sh 'python bin/win-prod-hockey.py'
+            withCredentials([string(credentialsId: 'MACOS_MAS_HOCKEY_TOKEN', variable: 'MACOS_MAS_HOCKEY_TOKEN')]) {
+              sh './bin/hockey/macos-prod-hockey.sh'
             }
           } else if (params.Release.equals('Custom')) {
-            withCredentials([string(credentialsId: "${params.WIN_CUSTOM_HOCKEY_ID}", variable: 'WIN_CUSTOM_HOCKEY_ID'), string(credentialsId: "${params.WIN_CUSTOM_HOCKEY_TOKEN}", variable: 'WIN_CUSTOM_HOCKEY_TOKEN')]) {
-              sh 'python bin/win-custom-hockey.py'
+            withCredentials([string(credentialsId: "${params.MACOS_CUSTOM_HOCKEY_ID}", variable: 'MACOS_CUSTOM_HOCKEY_ID'), string(credentialsId: "${params.MACOS_CUSTOM_HOCKEY_TOKEN}", variable: 'MACOS_CUSTOM_HOCKEY_TOKEN')]) {
+              sh 'node ./bin/hockey/macos-custom-hockey.js'
             }
           } else {
-            withCredentials([string(credentialsId: 'WIN_HOCKEY_TOKEN', variable: 'WIN_HOCKEY_TOKEN'), string(credentialsId: 'WIN_HOCKEY_ID', variable: 'WIN_HOCKEY_ID')]) {
-              sh 'python bin/win-internal-hockey.py'
+            withCredentials([string(credentialsId: 'MACOS_HOCKEY_TOKEN', variable: 'MACOS_HOCKEY_TOKEN')]) {
+              sh 'node ./bin/hockey/macos-internal-hockey.js'
             }
           }
         } catch(e) {
@@ -75,66 +131,26 @@ node('master') {
           wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
           throw e
         }
-      }, s3: {
+      } else if (projectName.contains('Linux')) {
         try {
-          withEnv(['BUCKET=wire-taco']) {
-            if (params.Release.equals('Production')) {
+          if (params.Release.equals('Production')) {
+            withEnv(['BUCKET=wire-taco']) {
               withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                sh 'python bin/win-prod-s3.py'
+                sh 'node ./bin/s3/linux-prod-s3.js'
               }
-            } else if (params.Release.equals('Custom')) {
-              // do nothing
-            } else {
-              withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                sh 'python bin/win-s3.py'
-              }
+            }
+          } else if (params.Release.equals('Custom')) {
+            // do nothing
+          } else {
+            withCredentials([string(credentialsId: 'LINUX_HOCKEY_ID', variable: 'LINUX_HOCKEY_ID'), string(credentialsId: 'LINUX_HOCKEY_TOKEN', variable: 'LINUX_HOCKEY_TOKEN')]) {
+              sh 'node ./bin/hockey/linux-internal-hockey.js'
             }
           }
         } catch(e) {
           currentBuild.result = 'FAILED'
-          wireSend secret: "$jenkinsbot_secret", message: "**Deploying to S3 failed for ${version}** see: ${JOB_URL}"
+          wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
           throw e
         }
-      }, failFast: true
-    } else if (projectName.contains('macOS')) {
-      try {
-        if (params.Release.equals('Production')) {
-          withCredentials([string(credentialsId: 'MACOS_MAS_HOCKEY_TOKEN', variable: 'MACOS_MAS_HOCKEY_TOKEN')]) {
-            sh './bin/macos-prod-hockey.sh'
-          }
-        } else if (params.Release.equals('Custom')) {
-          withCredentials([string(credentialsId: "${params.MACOS_CUSTOM_HOCKEY_ID}", variable: 'MACOS_CUSTOM_HOCKEY_ID'), string(credentialsId: "${params.MACOS_CUSTOM_HOCKEY_TOKEN}", variable: 'MACOS_CUSTOM_HOCKEY_TOKEN')]) {
-            sh './bin/macos-custom-hockey.py'
-          }
-        } else {
-          withCredentials([string(credentialsId: 'MACOS_HOCKEY_TOKEN', variable: 'MACOS_HOCKEY_TOKEN')]) {
-            sh './bin/macos-internal-hockey.py'
-          }
-        }
-      } catch(e) {
-        currentBuild.result = 'FAILED'
-        wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
-        throw e
-      }
-    } else if (projectName.contains('Linux')) {
-      try {
-        if (params.Release.equals('Production')) {
-          withEnv(['BUCKET=wire-taco']) {
-            withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh './bin/linux-prod-s3.py'
-            }
-          }
-        } else if (params.Release.equals('Custom')) {
-          // do nothing
-        } else {
-          withCredentials([string(credentialsId: 'LINUX_HOCKEY_ID', variable: 'LINUX_HOCKEY_ID'), string(credentialsId: 'LINUX_HOCKEY_TOKEN', variable: 'LINUX_HOCKEY_TOKEN')]) {
-            sh './bin/linux-internal-hockey.py'
-          }
-        }
-      } catch(e) {
-        currentBuild.result = 'FAILED'
-        wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
-        throw e
       }
     }
   }
@@ -142,16 +158,18 @@ node('master') {
   if (projectName.contains('Windows')) {
     stage('Update RELEASES file') {
       try {
-        withEnv(['BUCKET=wire-taco']) {
+        withEnv(['BUCKET=wire-taco', "PATH+NODE=${NODE}/bin"]) {
           if (params.Release.equals('Production')) {
             withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh 'python bin/win-prod-s3-deploy.py'
+              sh 'node ./bin/s3/win-prod-s3-deploy.js'
             }
           } else if (params.Release.equals('Custom')) {
-              // do nothing
+            withCredentials([string(credentialsId: "${params.AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${params.AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
+              sh 'node ./bin/s3/win-custom-s3-deploy.js'
+            }
           } else {
             withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh 'python bin/win-s3-deploy.py'
+              sh 'node ./bin/s3/win-internal-s3-deploy.js'
             }
           }
         }
@@ -166,17 +184,19 @@ node('master') {
   if (params.Release.equals('Production')) {
     stage('Upload build as draft to GitHub') {
       try {
-        if (projectName.contains('Windows')) {
-          withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
-            sh 'cd wrap/prod/Wire-win32-ia32/ && python ../../../bin/github_draft.py'
-          }
-        } else if (projectName.contains('macOS')) {
-          withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
-            sh 'python bin/github_draft.py'
-          }
-        } else if (projectName.contains('Linux')) {
-          withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
-            sh 'cd wrap/dist/ && python ../../bin/github_draft.py'
+        withEnv(["PATH+NODE=${NODE}/bin"]) {
+          if (projectName.contains('Windows')) {
+            withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
+              sh 'cd wrap/prod/Wire-win32-ia32/ && node ../../../bin/github_draft.js'
+            }
+          } else if (projectName.contains('macOS')) {
+            withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
+              sh 'node bin/github_draft.js'
+            }
+          } else if (projectName.contains('Linux')) {
+            withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
+              sh 'cd wrap/dist/ && node ../../bin/github_draft.js'
+            }
           }
         }
       } catch(e) {
