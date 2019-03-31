@@ -52,14 +52,13 @@ function zip(originalFile, zipFile) {
 
   return new Promise((resolve, reject) => {
     const readStream = fs.createReadStream(resolvedOriginal).on('error', reject);
-    const writeStream = fs.createWriteStream(resolvedZip).on('error', reject);
+    const writeStream = fs.createWriteStream(resolvedZip).on('error', reject).on('finish', () => resolve(resolvedZip));
     const jszip = new JSZip().file(path.basename(resolvedOriginal), readStream);
 
     jszip
       .generateNodeStream(jszipOptions)
       .pipe(writeStream)
-      .on('error', reject)
-      .on('finish', () => resolve(resolvedZip));
+      .on('error', reject);
   });
 }
 
