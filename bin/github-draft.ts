@@ -20,7 +20,7 @@
 
 import * as path from 'path';
 
-import axios from 'axios';
+import axios, {AxiosResponse} from 'axios';
 import * as commander from 'commander';
 import * as fs from 'fs-extra';
 
@@ -38,6 +38,11 @@ interface UploadOptions {
   filePath: string;
   fullDraftUrl: string;
   uploadUrl: string;
+}
+
+interface GitHubDraftData {
+  upload_url: string;
+  url: string;
 }
 
 commander
@@ -61,7 +66,7 @@ const draftUrl = `https://api.github.com/repos/wireapp/wire-desktop/releases`;
 
 const endsWithAny = (suffixes: string[], str: string) => suffixes.some(suffix => str.endsWith(suffix));
 
-async function createDraft(options: DraftOptions) {
+async function createDraft(options: DraftOptions): Promise<AxiosResponse<GitHubDraftData>> {
   const {changelog, commitish, tagName, title} = options;
 
   const draftData = {
@@ -77,7 +82,7 @@ async function createDraft(options: DraftOptions) {
   console.log(draftData);
 
   try {
-    const draftResponse = await axios.post(draftUrl, draftData, {headers: AuthorizationHeaders});
+    const draftResponse = await axios.post<GitHubDraftData>(draftUrl, draftData, {headers: AuthorizationHeaders});
     console.log('Draft created.');
     return draftResponse;
   } catch (error) {
@@ -88,7 +93,7 @@ async function createDraft(options: DraftOptions) {
   }
 }
 
-async function uploadAsset(options: UploadOptions) {
+async function uploadAsset(options: UploadOptions): Promise<void> {
   const {fileName, filePath, fullDraftUrl, uploadUrl} = options;
 
   console.log(`Uploading asset "${fileName}" ...`);
@@ -162,7 +167,7 @@ async function uploadAsset(options: UploadOptions) {
     await uploadAsset({fileName, filePath: resolvedPath, fullDraftUrl, uploadUrl});
   }
 
-  console.log('Done.');
+  console.log('Done creating draft.');
 })().catch(error => {
   console.error(error);
   process.exit(1);

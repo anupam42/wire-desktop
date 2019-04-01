@@ -84,7 +84,7 @@ async function deleteFromS3(deleteOptions: DeleteOptions): Promise<void> {
   console.log(`Deleted "${s3Path}" from S3`);
 }
 
-async function copyOnS3(copyOptions: CopyOptions) {
+async function copyOnS3(copyOptions: CopyOptions): Promise<void> {
   const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY} = process.env;
   const {bucket, s3FromPath, s3ToPath} = copyOptions;
   checkEnvVars(['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']);

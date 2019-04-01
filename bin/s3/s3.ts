@@ -95,7 +95,7 @@ async function getUploadFiles(
     await uploadToS3({bucket: commander.bucket, filePath, s3Path});
   }
 
-  console.log('Done.');
+  console.log('Done uploading to S3.');
 })().catch(error => {
   console.error(error);
   process.exit(1);

@@ -23,10 +23,10 @@ import {promisify} from 'util';
 
 interface FindOptions {
   cwd?: string;
-  noSafeGuard?: boolean;
+  safeGuard?: boolean;
 }
 
-interface FindResult {
+export interface FindResult {
   fileName: string;
   filePath: string;
 }
@@ -39,10 +39,12 @@ function checkEnvVars(envVars: string[]) {
   });
 }
 
-async function findDown(fileName: string, options?: FindOptions): Promise<FindResult> {
+async function findDown(fileName: string, options: {cwd?: string; safeGuard: false}): Promise<Partial<FindResult>>;
+async function findDown(fileName: string, options: {cwd?: string; safeGuard?: boolean}): Promise<FindResult>;
+async function findDown(fileName: string, options?: FindOptions): Promise<FindResult | Partial<FindResult>> {
   const fullOptions: Required<FindOptions> = {
     cwd: '.',
-    noSafeGuard: false,
+    safeGuard: true,
     ...options,
   };
   const resolvedPath = path.resolve(fullOptions.cwd);
@@ -75,7 +77,11 @@ async function findDown(fileName: string, options?: FindOptions): Promise<FindRe
     }
   }
 
-  throw new Error(`Could not find "${fileName}".`);
+  if (fullOptions.safeGuard) {
+    throw new Error(`Could not find "${fileName}".`);
+  }
+
+  return {};
 }
 
 async function execAsync(command: string) {

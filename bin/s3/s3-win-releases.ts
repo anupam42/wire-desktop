@@ -72,7 +72,7 @@ if (!commander.bucket || !commander.wrapperBuild || !commander.wrapperBuild.incl
   await copyOnS3({bucket: bucket, s3FromPath: `${bucket}/${latestReleaseKey}`, s3ToPath: staticReleaseKey});
   await copyOnS3({bucket: bucket, s3FromPath: `${bucket}/${latestExeKey}`, s3ToPath: staticExeKey});
 
-  console.log('Done.');
+  console.log('Done updating RELEASES on S3.');
 })().catch(error => {
   console.error(error);
   process.exit(1);

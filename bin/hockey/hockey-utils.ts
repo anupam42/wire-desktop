@@ -18,8 +18,6 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-//@ts-check
-
 import * as path from 'path';
 
 import axios from 'axios';
@@ -130,9 +128,9 @@ async function uploadVersion(options: UploadOptions): Promise<void> {
 
   try {
     await axios.put(hockeyUrl, formData, {headers, maxContentLength: 524288000});
-    console.log(`Hockey upload finished`);
+    console.log('Done uploading to Hockey.');
   } catch (error) {
-    console.log(error);
+    console.error(error);
     throw new Error(
       `Hockey version upload failed with status code "${error.response.status}": "${error.response.statusText}"`
     );

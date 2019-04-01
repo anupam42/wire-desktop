@@ -65,7 +65,7 @@
       "eslint --fix",
       "git add"
     ],
-    "bin/*.ts": [
+    "bin/**/*.ts": [
       "tslint --project tsconfig.tools.json --fix",
       "git add"
     ],
