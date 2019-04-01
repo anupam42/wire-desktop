@@ -6,6 +6,7 @@
     "rootDir": "bin",
     "sourceMap": false
   },
-  "exclude": ["electron", "node_modules", "wrap"],
+  "exclude": [],
+  "include": ["bin"],
   "extends": "./tsconfig.json"
 }
