@@ -49,7 +49,7 @@ node('master') {
     }
   }
 
-  currentBuild.displayName = "Deploy $projectName " + version
+  currentBuild.displayName = "Deploy ${projectName} ${version}"
 
   stage('Install dependencies') {
     try {
@@ -68,21 +68,43 @@ node('master') {
   stage('Upload to S3 and/or Hockey') {
     withEnv(["PATH+NODE=${NODE}/bin"]) {
       if (projectName.contains('Windows')) {
+        try {
+          def AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
+          def AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+          def HOCKEY_ID = ''
+          def HOCKEY_TOKEN = ''
+          def S3_BUCKET = 'wire-taco'
+          def S3_PATH = ''
+          def SEARCH_PATH = ''
+
+          if (params.Release.equals('Production')) {
+            HOCKEY_ID = credentials('WIN_PROD_HOCKEY_ID')
+            HOCKEY_TOKEN = credentials('WIN_PROD_HOCKEY_TOKEN')
+            S3_PATH = 'win/prod'
+            SEARCH_PATH = './wrap/prod/'
+          } else if (params.Release.equals('Custom')) {
+            AWS_ACCESS_KEY_ID = credentials("${params.AWS_CUSTOM_ACCESS_KEY_ID}")
+            AWS_SECRET_ACCESS_KEY = credentials("${params.AWS_CUSTOM_SECRET_ACCESS_KEY}")
+            HOCKEY_ID = credentials("${params.WIN_CUSTOM_HOCKEY_ID}")
+            HOCKEY_TOKEN = credentials("${params.WIN_CUSTOM_HOCKEY_TOKEN}")
+            S3_BUCKET = "${params.WIN_S3_BUCKET}"
+            S3_PATH = "${params.WIN_S3_PATH}"
+            SEARCH_PATH = './wrap/'
+          } else {
+            HOCKEY_ID = credentials('WIN_HOCKEY_TOKEN')
+            HOCKEY_TOKEN = credentials('WIN_HOCKEY_ID')
+            S3_PATH = 'win/internal'
+            SEARCH_PATH = './wrap/internal/'
+          }
+        } catch(e) {
+          currentBuild.result = 'FAILED'
+          wireSend secret: "$jenkinsbot_secret", message: "**Setting environment variables failed for ${version}** see: ${JOB_URL}"
+          throw e
+        }
+
         parallel hockey: {
           try {
-            if (params.Release.equals('Production')) {
-              withCredentials([string(credentialsId: 'WIN_PROD_HOCKEY_TOKEN', variable: 'WIN_PROD_HOCKEY_TOKEN'), string(credentialsId: 'WIN_PROD_HOCKEY_ID', variable: 'WIN_PROD_HOCKEY_ID')]) {
-                sh "node ./bin/hockey/hockey.js -i ${WIN_PROD_HOCKEY_ID} -t ${WIN_PROD_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ./wrap/dist"
-              }
-            } else if (params.Release.equals('Custom')) {
-              withCredentials([string(credentialsId: "${WIN_CUSTOM_HOCKEY_ID}", variable: 'WIN_CUSTOM_HOCKEY_ID'), string(credentialsId: "${WIN_CUSTOM_HOCKEY_TOKEN}", variable: 'WIN_CUSTOM_HOCKEY_TOKEN')]) {
-                sh "node ./bin/hockey/hockey.js -i ${WIN_CUSTOM_HOCKEY_ID} -t ${WIN_CUSTOM_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ./wrap/dist"
-              }
-            } else {
-              withCredentials([string(credentialsId: 'WIN_HOCKEY_TOKEN', variable: 'WIN_HOCKEY_TOKEN'), string(credentialsId: 'WIN_HOCKEY_ID', variable: 'WIN_HOCKEY_ID')]) {
-                sh "node ./bin/hockey/hockey.js -i ${WIN_HOCKEY_ID} -t ${WIN_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ./wrap/dist"
-              }
-            }
+            sh "node ./bin/hockey/hockey.js --hockey-id \"${HOCKEY_ID}\" --hockey-token \"${HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
           } catch(e) {
             currentBuild.result = 'FAILED'
             wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
@@ -90,21 +112,7 @@ node('master') {
           }
         }, s3: {
           try {
-            withEnv(['BUCKET=wire-taco']) {
-              if (params.Release.equals('Production')) {
-                withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  sh "node ./bin/s3/s3.js -b ${BUCKET} -s Windows -s win/prod -w ${WRAPPER_BUILD} -p ./wrap/dist"
-                }
-              } else if (params.Release.equals('Custom')) {
-                withCredentials([string(credentialsId: "${AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  sh "node ./bin/s3/s3.js -b ${WIN_S3_BUCKET} -s Windows -s ${WIN_S3_PATH} -w ${WRAPPER_BUILD} -p ./wrap/dist"
-                }
-              } else {
-                withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  sh "node ./bin/s3/s3.js -b ${BUCKET} -s Windows -s win/internal -w ${WRAPPER_BUILD} -p ./wrap/dist"
-                }
-              }
-            }
+            sh "node ./bin/s3/s3.js --bucket \"${S3_BUCKET}\" --s3-path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
           } catch(e) {
             currentBuild.result = 'FAILED'
             wireSend secret: "$jenkinsbot_secret", message: "**Deploying to S3 failed for ${version}** see: ${JOB_URL}"
@@ -113,19 +121,21 @@ node('master') {
         }, failFast: true
       } else if (projectName.contains('macOS')) {
         try {
+          def MACOS_HOCKEY_ID = ''
+          def MACOS_HOCKEY_TOKEN = ''
+
           if (params.Release.equals('Production')) {
-            withCredentials([string(credentialsId: 'MACOS_MAS_HOCKEY_ID', variable: 'MACOS_MAS_HOCKEY_ID'), string(credentialsId: 'MACOS_MAS_HOCKEY_TOKEN', variable: 'MACOS_MAS_HOCKEY_TOKEN')]) {
-              sh "node ./bin/hockey/hockey.js -i ${MACOS_MAS_HOCKEY_ID} -t ${MACOS_MAS_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ."
-            }
+            MACOS_HOCKEY_ID = credentials('MACOS_MAS_HOCKEY_ID')
+            MACOS_HOCKEY_TOKEN = credentials('MACOS_MAS_HOCKEY_TOKEN')
           } else if (params.Release.equals('Custom')) {
-            withCredentials([string(credentialsId: "${MACOS_CUSTOM_HOCKEY_ID}", variable: 'MACOS_CUSTOM_HOCKEY_ID'), string(credentialsId: "${MACOS_CUSTOM_HOCKEY_TOKEN}", variable: 'MACOS_CUSTOM_HOCKEY_TOKEN')]) {
-              sh "node ./bin/hockey/hockey.js -i ${MACOS_CUSTOM_HOCKEY_ID} -t ${MACOS_CUSTOM_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ."
-            }
+            MACOS_HOCKEY_ID = credentials("${params.MACOS_CUSTOM_HOCKEY_ID}")
+            MACOS_HOCKEY_TOKEN = credentials("${params.MACOS_CUSTOM_HOCKEY_TOKEN}")
           } else {
-            withCredentials([string(credentialsId: 'MACOS_HOCKEY_ID', variable: 'MACOS_HOCKEY_ID'), string(credentialsId: 'MACOS_HOCKEY_TOKEN', variable: 'MACOS_HOCKEY_TOKEN')]) {
-              sh "node ./bin/hockey/hockey.js -i ${MACOS_HOCKEY_ID} -t ${MACOS_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ."
-            }
+            MACOS_HOCKEY_ID = credentials('MACOS_HOCKEY_ID')
+            MACOS_HOCKEY_TOKEN = credentials('MACOS_HOCKEY_TOKEN')
           }
+
+          sh "node ./bin/hockey/hockey.js --hockey-id \"${MACOS_HOCKEY_ID}\" --hockey-token \"${MACOS_HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ."
         } catch(e) {
           currentBuild.result = 'FAILED'
           wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
@@ -134,17 +144,17 @@ node('master') {
       } else if (projectName.contains('Linux')) {
         try {
           if (params.Release.equals('Production')) {
-            withEnv(['BUCKET=wire-taco']) {
-              withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                sh "node ./bin/s3/s3.js -b ${BUCKET} -s Linux -s linux -w ${WRAPPER_BUILD} -p ./wrap/dist"
-              }
-            }
+            def AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
+            def AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+
+            sh "node ./bin/s3/s3.js --bucket wire-taco --s3path linux --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
           } else if (params.Release.equals('Custom')) {
             // do nothing
           } else {
-            withCredentials([string(credentialsId: 'LINUX_HOCKEY_ID', variable: 'LINUX_HOCKEY_ID'), string(credentialsId: 'LINUX_HOCKEY_TOKEN', variable: 'LINUX_HOCKEY_TOKEN')]) {
-              sh "node ./bin/hockey/hockey.js -i ${LINUX_HOCKEY_ID} -t ${LINUX_HOCKEY_TOKEN} -w ${WRAPPER_BUILD} -p ./wrap/dist"
-            }
+            def LINUX_HOCKEY_ID = credentials('LINUX_HOCKEY_ID')
+            def LINUX_HOCKEY_TOKEN = credentials('LINUX_HOCKEY_TOKEN')
+
+            sh "node ./bin/hockey/hockey.js --hockey-id \"${LINUX_HOCKEY_ID}\" --hockey-token \"${LINUX_HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
           }
         } catch(e) {
           currentBuild.result = 'FAILED'
@@ -158,20 +168,24 @@ node('master') {
   if (projectName.contains('Windows')) {
     stage('Update RELEASES file') {
       try {
-        withEnv(['BUCKET=wire-taco', "PATH+NODE=${NODE}/bin"]) {
+        withEnv(["PATH+NODE=${NODE}/bin"]) {
+          def S3_PATH = ''
+          def S3_BUCKET = 'wire-taco'
+          def AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
+          def AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+
           if (params.Release.equals('Production')) {
-            withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh "node ./bin/s3/s3-releases.js -b ${BUCKET} -s Windows -s win/prod -w ${WRAPPER_BUILD} -p ./wrap/dist"
-            }
+            S3_PATH = 'win/prod'
           } else if (params.Release.equals('Custom')) {
-            withCredentials([string(credentialsId: "${AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh "node ./bin/s3/s3-releases.js -b ${WIN_S3_BUCKET} -s Windows -s ${WIN_S3_PATH} -w ${WRAPPER_BUILD} -p ./wrap/dist"
-            }
+            S3_PATH = "${params.WIN_S3_PATH}"
+            S3_BUCKET = "${params.WIN_S3_BUCKET}"
+            AWS_ACCESS_KEY_ID = credentials("${params.AWS_CUSTOM_ACCESS_KEY_ID}")
+            AWS_SECRET_ACCESS_KEY = credentials("${params.AWS_CUSTOM_SECRET_ACCESS_KEY}")
           } else {
-            withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh "node ./bin/s3/s3-releases.js -b ${BUCKET} -s Windows -s win/internal -w ${WRAPPER_BUILD} -p ./wrap/dist"
-            }
+            S3_PATH = 'win/internal'
           }
+
+          sh "node ./bin/s3/s3-win-releases.js --bucket \"${S3_BUCKET}\" --path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
         }
       } catch(e) {
         currentBuild.result = 'FAILED'
@@ -185,19 +199,18 @@ node('master') {
     stage('Upload build as draft to GitHub') {
       try {
         withEnv(["PATH+NODE=${NODE}/bin"]) {
+          def SEARCH_PATH = ''
+          def GITHUB_ACCESS_TOKEN = credentials('GITHUB_ACCESS_TOKEN')
+
           if (projectName.contains('Windows')) {
-            withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
-              sh "node ./bin/github_draft.js -t "${GITHUB_ACCESS_TOKEN}" -w ${WRAPPER_BUILD} -p wrap/prod/Wire-win32-ia32/"
-            }
+            SEARCH_PATH = 'wrap/prod/Wire-win32-ia32/'
           } else if (projectName.contains('macOS')) {
-            withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
-              sh "node ./bin/github_draft.js -t "${GITHUB_ACCESS_TOKEN}" -w ${WRAPPER_BUILD} -p ."
-            }
+            SEARCH_PATH = '.'
           } else if (projectName.contains('Linux')) {
-            withCredentials([string(credentialsId: 'GITHUB_ACCESS_TOKEN', variable: 'GITHUB_ACCESS_TOKEN')]) {
-              sh "node ./bin/github_draft.js -t "${GITHUB_ACCESS_TOKEN}" -w ${WRAPPER_BUILD} -p wrap/dist"
-            }
+            SEARCH_PATH = 'wrap/dist'
           }
+
+          sh "node ./bin/github_draft.js --github-token \"${GITHUB_ACCESS_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
         }
       } catch(e) {
         currentBuild.result = 'FAILED'
