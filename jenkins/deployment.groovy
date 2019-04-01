@@ -104,7 +104,7 @@ node('master') {
 
         parallel hockey: {
           try {
-            sh "node ./bin/hockey/hockey.js --hockey-id \"${HOCKEY_ID}\" --hockey-token \"${HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
+            sh "npx ts-node ./bin/hockey/hockey.ts --hockey-id \"${HOCKEY_ID}\" --hockey-token \"${HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
           } catch(e) {
             currentBuild.result = 'FAILED'
             wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
@@ -112,7 +112,7 @@ node('master') {
           }
         }, s3: {
           try {
-            sh "node ./bin/s3/s3.js --bucket \"${S3_BUCKET}\" --s3-path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
+            sh "npx ts-node ./bin/s3/s3.ts --bucket \"${S3_BUCKET}\" --s3-path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
           } catch(e) {
             currentBuild.result = 'FAILED'
             wireSend secret: "$jenkinsbot_secret", message: "**Deploying to S3 failed for ${version}** see: ${JOB_URL}"
@@ -135,7 +135,7 @@ node('master') {
             MACOS_HOCKEY_TOKEN = credentials('MACOS_HOCKEY_TOKEN')
           }
 
-          sh "node ./bin/hockey/hockey.js --hockey-id \"${MACOS_HOCKEY_ID}\" --hockey-token \"${MACOS_HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ."
+          sh "npx ts-node ./bin/hockey/hockey.ts --hockey-id \"${MACOS_HOCKEY_ID}\" --hockey-token \"${MACOS_HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ."
         } catch(e) {
           currentBuild.result = 'FAILED'
           wireSend secret: "$jenkinsbot_secret", message: "**Deploying to Hockey failed for ${version}** see: ${JOB_URL}"
@@ -147,14 +147,14 @@ node('master') {
             def AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
             def AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
 
-            sh "node ./bin/s3/s3.js --bucket wire-taco --s3path linux --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
+            sh "npx ts-node ./bin/s3/s3.ts --bucket wire-taco --s3path linux --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
           } else if (params.Release.equals('Custom')) {
             // do nothing
           } else {
             def LINUX_HOCKEY_ID = credentials('LINUX_HOCKEY_ID')
             def LINUX_HOCKEY_TOKEN = credentials('LINUX_HOCKEY_TOKEN')
 
-            sh "node ./bin/hockey/hockey.js --hockey-id \"${LINUX_HOCKEY_ID}\" --hockey-token \"${LINUX_HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
+            sh "npx ts-node ./bin/hockey/hockey.ts --hockey-id \"${LINUX_HOCKEY_ID}\" --hockey-token \"${LINUX_HOCKEY_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
           }
         } catch(e) {
           currentBuild.result = 'FAILED'
@@ -189,7 +189,7 @@ node('master') {
             SEARCH_PATH = './wrap/internal/'
           }
 
-          sh "node ./bin/s3/s3-win-releases.js --bucket \"${S3_BUCKET}\" --path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
+          sh "npx ts-node ./bin/s3/s3-win-releases.ts --bucket \"${S3_BUCKET}\" --path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
         }
       } catch(e) {
         currentBuild.result = 'FAILED'
@@ -214,7 +214,7 @@ node('master') {
             SEARCH_PATH = 'wrap/dist'
           }
 
-          sh "node ./bin/github_draft.js --github-token \"${GITHUB_ACCESS_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
+          sh "npx ts-node ./bin/github_draft.ts --github-token \"${GITHUB_ACCESS_TOKEN}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
         }
       } catch(e) {
         currentBuild.result = 'FAILED'
