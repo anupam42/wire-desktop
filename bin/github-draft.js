@@ -154,15 +154,14 @@ async function uploadAsset(options) {
     const uploadUrl = upload_url.split('{')[0];
 
     const files = await fs.readdir(basePath);
-
-    await Promise.all(
-      files
-        .filter(fileName => endsWithAny(['.asc', '.sig', '.AppImage', '.deb', '.exe', '.pkg'], fileName))
-        .map(fileName => {
-          const resolvedPath = path.join(basePath, fileName);
-          return uploadAsset({fileName, filePath: resolvedPath, fullDraftUrl, uploadUrl});
-        })
+    const uploadFiles = files.filter(fileName =>
+      endsWithAny(['.asc', '.sig', '.AppImage', '.deb', '.exe', '.pkg'], fileName)
     );
+
+    for (const fileName in uploadFiles) {
+      const resolvedPath = path.join(basePath, fileName);
+      await uploadAsset({fileName, filePath: resolvedPath, fullDraftUrl, uploadUrl});
+    }
 
     console.log('Done.');
   } catch (error) {
