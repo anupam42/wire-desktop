@@ -60,7 +60,7 @@ node('master') {
         sh 'yarn --ignore-scripts'
       }
     } catch (e) {
-      wireSend secret: "$jenkinsbot_secret", message: "**Could not get build artifacts from of ${version} from ${projectName}** see: ${JOB_URL}"
+      wireSend secret: "$jenkinsbot_secret", message: "**Could not get build artifacts of ${version} from ${projectName}** see: ${JOB_URL}"
       throw e
     }
   }
@@ -169,23 +169,27 @@ node('master') {
     stage('Update RELEASES file') {
       try {
         withEnv(["PATH+NODE=${NODE}/bin"]) {
-          def S3_PATH = ''
-          def S3_BUCKET = 'wire-taco'
           def AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
           def AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+          def S3_BUCKET = 'wire-taco'
+          def S3_PATH = ''
+          def SEARCH_PATH = ''
 
           if (params.Release.equals('Production')) {
             S3_PATH = 'win/prod'
+            SEARCH_PATH = './wrap/prod/'
           } else if (params.Release.equals('Custom')) {
             S3_PATH = "${params.WIN_S3_PATH}"
             S3_BUCKET = "${params.WIN_S3_BUCKET}"
             AWS_ACCESS_KEY_ID = credentials("${params.AWS_CUSTOM_ACCESS_KEY_ID}")
             AWS_SECRET_ACCESS_KEY = credentials("${params.AWS_CUSTOM_SECRET_ACCESS_KEY}")
+            SEARCH_PATH = './wrap/'
           } else {
             S3_PATH = 'win/internal'
+            SEARCH_PATH = './wrap/internal/'
           }
 
-          sh "node ./bin/s3/s3-win-releases.js --bucket \"${S3_BUCKET}\" --path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path ./wrap/dist"
+          sh "node ./bin/s3/s3-win-releases.js --bucket \"${S3_BUCKET}\" --path \"${S3_PATH}\" --wrapper-build \"${WRAPPER_BUILD}\" --path \"${SEARCH_PATH}\""
         }
       } catch(e) {
         currentBuild.result = 'FAILED'
