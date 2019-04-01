@@ -18,15 +18,27 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-//@ts-check
+import * as path from 'path';
 
-const path = require('path');
+import axios from 'axios';
+import * as commander from 'commander';
+import * as fs from 'fs-extra';
 
-const {default: axios} = require('axios');
-const commander = require('commander');
-const fs = require('fs-extra');
+import {execAsync} from './utils';
 
-const {execAsync} = require('./utils');
+interface DraftOptions {
+  changelog: string;
+  commitish: string;
+  tagName: string;
+  title: string;
+}
+
+interface UploadOptions {
+  fileName: string;
+  filePath: string;
+  fullDraftUrl: string;
+  uploadUrl: string;
+}
 
 commander
   .name('github-draft.js')
@@ -47,17 +59,9 @@ const AuthorizationHeaders = {
 
 const draftUrl = `https://api.github.com/repos/wireapp/wire-desktop/releases`;
 
-/**
- * @param {string[]} suffixes
- * @param {string} str
- */
-const endsWithAny = (suffixes, str) => suffixes.some(suffix => str.endsWith(suffix));
+const endsWithAny = (suffixes: string[], str: string) => suffixes.some(suffix => str.endsWith(suffix));
 
-/**
- * @typedef {{changelog: string, commitish: string, tagName: string, title: string}} DraftOptions
- * @param {DraftOptions} options
- */
-async function createDraft(options) {
+async function createDraft(options: DraftOptions) {
   const {changelog, commitish, tagName, title} = options;
 
   const draftData = {
@@ -84,11 +88,7 @@ async function createDraft(options) {
   }
 }
 
-/**
- * @typedef {{fileName: string, filePath: string, fullDraftUrl: string, uploadUrl: string}} UploadOptions
- * @param {UploadOptions} options
- */
-async function uploadAsset(options) {
+async function uploadAsset(options: UploadOptions) {
   const {fileName, filePath, fullDraftUrl, uploadUrl} = options;
 
   console.log(`Uploading asset "${fileName}" ...`);
@@ -123,49 +123,47 @@ async function uploadAsset(options) {
 }
 
 (async () => {
-  try {
-    let PLATFORM;
+  let PLATFORM;
 
-    const [platform, version] = commander.wrapperBuild.toLowerCase().split('#');
-    const basePath = commander.path || path.resolve('.');
+  const [platform, version] = commander.wrapperBuild.toLowerCase().split('#');
+  const basePath = commander.path || path.resolve('.');
 
-    if (platform === 'linux') {
-      PLATFORM = 'Linux';
-    } else if (platform === 'windows') {
-      PLATFORM = 'Windows';
-    } else if (platform === 'macos') {
-      PLATFORM = 'macOS';
-    } else {
-      throw new Error('Invalid platform');
-    }
-
-    const commitish = await execAsync('git rev-parse HEAD');
-
-    const changelog = '...';
-
-    const draftResponse = await createDraft({
-      changelog,
-      commitish,
-      tagName: `${platform}/${version}`,
-      title: `${version} - ${PLATFORM}`,
-    });
-
-    const {upload_url, url: fullDraftUrl} = draftResponse.data;
-    const uploadUrl = upload_url.split('{')[0];
-
-    const files = await fs.readdir(basePath);
-    const uploadFiles = files.filter(fileName =>
-      endsWithAny(['.asc', '.sig', '.AppImage', '.deb', '.exe', '.pkg'], fileName)
-    );
-
-    for (const fileName in uploadFiles) {
-      const resolvedPath = path.join(basePath, fileName);
-      await uploadAsset({fileName, filePath: resolvedPath, fullDraftUrl, uploadUrl});
-    }
-
-    console.log('Done.');
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
+  if (platform === 'linux') {
+    PLATFORM = 'Linux';
+  } else if (platform === 'windows') {
+    PLATFORM = 'Windows';
+  } else if (platform === 'macos') {
+    PLATFORM = 'macOS';
+  } else {
+    throw new Error('Invalid platform');
   }
-})();
+
+  const commitish = await execAsync('git rev-parse HEAD');
+
+  const changelog = '...';
+
+  const draftResponse = await createDraft({
+    changelog,
+    commitish,
+    tagName: `${platform}/${version}`,
+    title: `${version} - ${PLATFORM}`,
+  });
+
+  const {upload_url, url: fullDraftUrl} = draftResponse.data;
+  const uploadUrl = upload_url.split('{')[0];
+
+  const files = await fs.readdir(basePath);
+  const uploadFiles = files.filter(fileName =>
+    endsWithAny(['.asc', '.sig', '.AppImage', '.deb', '.exe', '.pkg'], fileName)
+  );
+
+  for (const fileName in uploadFiles) {
+    const resolvedPath = path.join(basePath, fileName);
+    await uploadAsset({fileName, filePath: resolvedPath, fullDraftUrl, uploadUrl});
+  }
+
+  console.log('Done.');
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});

@@ -16,18 +16,27 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-//@ts-check
+import * as S3 from 'aws-sdk/clients/s3';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import {checkEnvVars} from '../utils';
 
-const path = require('path');
-const fs = require('fs-extra');
-const S3 = require('aws-sdk/clients/s3');
-const {checkEnvVars} = require('../utils');
+interface DeleteOptions {
+  bucket: string;
+  s3Path: string;
+}
 
-/**
- * @typedef {{bucket: string; filePath: string; s3Path: string}} UploadOptions
- * @param {UploadOptions} uploadOptions
- */
-async function uploadToS3(uploadOptions) {
+interface UploadOptions extends DeleteOptions {
+  filePath: string;
+}
+
+interface CopyOptions {
+  bucket: string;
+  s3FromPath: string;
+  s3ToPath: string;
+}
+
+async function uploadToS3(uploadOptions: UploadOptions): Promise<void> {
   const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY} = process.env;
   const {bucket, filePath, s3Path} = uploadOptions;
   checkEnvVars(['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']);
@@ -57,11 +66,7 @@ async function uploadToS3(uploadOptions) {
   console.log('Uploaded to S3.');
 }
 
-/**
- * @typedef {{bucket: string; s3Path: string}} DeleteOptions
- * @param {DeleteOptions} deleteOptions
- */
-async function deleteFromS3(deleteOptions) {
+async function deleteFromS3(deleteOptions: DeleteOptions): Promise<void> {
   const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY} = process.env;
   const {bucket, s3Path} = deleteOptions;
   checkEnvVars(['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']);
@@ -79,11 +84,7 @@ async function deleteFromS3(deleteOptions) {
   console.log(`Deleted "${s3Path}" from S3`);
 }
 
-/**
- * @typedef {{bucket: string; s3FromPath: string; s3ToPath: string}} CopyOptions
- * @param {CopyOptions} copyOptions
- */
-async function copyOnS3(copyOptions) {
+async function copyOnS3(copyOptions: CopyOptions) {
   const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY} = process.env;
   const {bucket, s3FromPath, s3ToPath} = copyOptions;
   checkEnvVars(['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']);
@@ -103,4 +104,4 @@ async function copyOnS3(copyOptions) {
   console.log(`Copied "${s3FromPath}" to "${s3ToPath}" on S3`);
 }
 
-module.exports = {copyOnS3, deleteFromS3, uploadToS3};
+export {copyOnS3, deleteFromS3, uploadToS3};

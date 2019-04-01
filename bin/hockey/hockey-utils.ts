@@ -20,26 +20,27 @@
 
 //@ts-check
 
-const path = require('path');
+import * as path from 'path';
 
-const {default: axios} = require('axios');
-const FormData = require('form-data');
-const JSZip = require('jszip');
-const fs = require('fs-extra');
+import axios from 'axios';
+import * as FormData from 'form-data';
+import * as fs from 'fs-extra';
+import * as JSZip from 'jszip';
 
 const HOCKEY_API_URL = 'https://rink.hockeyapp.net/api/2/apps';
 
-/**
- * @typedef {{hockeyAppId: string, hockeyToken: string, version: string}} HockeyOptions
- * @typedef {{filePath: string, hockeyVersionId: number | string} & HockeyOptions} UploadOptions
- */
+interface HockeyOptions {
+  hockeyAppId: string;
+  hockeyToken: string;
+  version: string;
+}
 
-/**
- * @param {string} originalFile
- * @param {string} zipFile
- * @returns {Promise<string>}
- */
-function zip(originalFile, zipFile) {
+interface UploadOptions extends HockeyOptions {
+  filePath: string;
+  hockeyVersionId: number | string;
+}
+
+function zip(originalFile: string, zipFile: string): Promise<string> {
   const resolvedOriginal = path.resolve(originalFile);
   const resolvedZip = path.resolve(zipFile);
 
@@ -52,7 +53,10 @@ function zip(originalFile, zipFile) {
 
   return new Promise((resolve, reject) => {
     const readStream = fs.createReadStream(resolvedOriginal).on('error', reject);
-    const writeStream = fs.createWriteStream(resolvedZip).on('error', reject).on('finish', () => resolve(resolvedZip));
+    const writeStream = fs
+      .createWriteStream(resolvedZip)
+      .on('error', reject)
+      .on('finish', () => resolve(resolvedZip));
     const jszip = new JSZip().file(path.basename(resolvedOriginal), readStream);
 
     jszip
@@ -62,11 +66,7 @@ function zip(originalFile, zipFile) {
   });
 }
 
-/**
- * @param {HockeyOptions} options
- * @returns {Promise<{id: string}>}
- */
-async function createVersion(options) {
+async function createVersion(options: HockeyOptions): Promise<{id: string}> {
   const {hockeyAppId, hockeyToken, version} = options;
   const [majorVersion, minorVersion, patchVersion] = version.split('.');
 
@@ -98,8 +98,7 @@ async function createVersion(options) {
   }
 }
 
-/** @param {UploadOptions} options */
-async function uploadVersion(options) {
+async function uploadVersion(options: UploadOptions): Promise<void> {
   const {filePath, hockeyAppId, hockeyToken, hockeyVersionId, version} = options;
   const semverVersion = version.split('.');
   const resolvedFile = path.resolve(filePath);
@@ -140,4 +139,4 @@ async function uploadVersion(options) {
   }
 }
 
-module.exports = {createVersion, uploadVersion, zip};
+export {createVersion, uploadVersion, zip};

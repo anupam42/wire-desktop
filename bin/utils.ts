@@ -16,15 +16,22 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-//@ts-check
+import {exec} from 'child_process';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import {promisify} from 'util';
 
-const path = require('path');
-const {exec} = require('child_process');
-const {promisify} = require('util');
-const fs = require('fs-extra');
+interface FindOptions {
+  cwd?: string;
+  noSafeGuard?: boolean;
+}
 
-/** @param {string[]} envVars */
-function checkEnvVars(envVars) {
+interface FindResult {
+  fileName: string;
+  filePath: string;
+}
+
+function checkEnvVars(envVars: string[]) {
   envVars.forEach(envVar => {
     if (!process.env[envVar]) {
       throw new Error(`Environment variable "${envVar}" is not defined.`);
@@ -32,20 +39,13 @@ function checkEnvVars(envVars) {
   });
 }
 
-/**
- * @typedef {{cwd?: string; safeGuard?: boolean}} FindOptions
- * @typedef {{fileName: string; filePath: string}} FindResult
- * @param {string} fileName
- * @param {FindOptions} [options]
- * @returns {Promise<FindResult|Partial<FindResult>>}
- */
-async function findDown(fileName, options) {
-  options = {
+async function findDown(fileName: string, options?: FindOptions): Promise<FindResult> {
+  const fullOptions: Required<FindOptions> = {
     cwd: '.',
-    safeGuard: true,
+    noSafeGuard: false,
     ...options,
   };
-  const resolvedPath = path.resolve(options.cwd);
+  const resolvedPath = path.resolve(fullOptions.cwd);
   const currentFiles = [];
   const currentDirs = [];
   const dirContent = (await fs.readdir(resolvedPath)).sort();
@@ -75,15 +75,10 @@ async function findDown(fileName, options) {
     }
   }
 
-  if (options.safeGuard) {
-    throw new Error(`Could not find "${fileName}".`);
-  }
-
-  return {};
+  throw new Error(`Could not find "${fileName}".`);
 }
 
-/** @param {string} command */
-async function execAsync(command) {
+async function execAsync(command: string) {
   const {stderr, stdout} = await promisify(exec)(command);
   if (stderr) {
     throw new Error(stderr.trim());
@@ -91,4 +86,4 @@ async function execAsync(command) {
   return stdout.trim();
 }
 
-module.exports = {checkEnvVars, execAsync, findDown};
+export {checkEnvVars, execAsync, findDown};

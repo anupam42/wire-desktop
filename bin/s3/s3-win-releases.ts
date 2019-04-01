@@ -18,12 +18,10 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-//@ts-check
-
-const commander = require('commander');
-const path = require('path');
-const {copyOnS3, deleteFromS3} = require('./s3-utils');
-const {findDown} = require('../utils');
+import * as commander from 'commander';
+import * as path from 'path';
+import {findDown} from '../utils';
+import {copyOnS3, deleteFromS3} from './s3-utils';
 
 commander
   .name('s3-win-releases.js')
@@ -52,24 +50,30 @@ if (!commander.bucket || !commander.wrapperBuild || !commander.wrapperBuild.incl
 
   const nupkgFile = await findDown('-full.nupkg', {cwd: searchBasePath});
   const setupExe = await findDown('-Setup.exe', {cwd: searchBasePath});
-  const appShortName = new RegExp('(.+)-[\\d.]+-full\\.nupkg').exec(nupkgFile.fileName)[1];
-  const appFullName = new RegExp('(.+)-Setup\\.exe').exec(setupExe.fileName)[1];
+  const [, appShortName] = new RegExp('(.+)-[\\d.]+-full\\.nupkg').exec(nupkgFile.fileName);
+  const [, appFullName] = new RegExp('(.+)-Setup\\.exe').exec(setupExe.fileName);
 
-  try {
-    const staticReleaseKey = `${s3BasePath}/RELEASES`;
-    const staticExeKey = `${s3BasePath}/${appFullName}-Setup.exe`;
-
-    const latestReleaseKey = `${s3BasePath}/${appShortName}-${version}-RELEASES`;
-    const latestExeKey = `${s3BasePath}/${appShortName}-${version}.exe`;
-
-    await deleteFromS3({bucket: bucket, s3Path: staticReleaseKey});
-    await deleteFromS3({bucket: bucket, s3Path: staticExeKey});
-    await copyOnS3({bucket: bucket, s3FromPath: `${bucket}/${latestReleaseKey}`, s3ToPath: staticReleaseKey});
-    await copyOnS3({bucket: bucket, s3FromPath: `${bucket}/${latestExeKey}`, s3ToPath: staticExeKey});
-
-    console.log('Done.');
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
+  if (!appShortName) {
+    throw new Error('App short name not found');
   }
-})();
+
+  if (!appFullName) {
+    throw new Error('App full name not found');
+  }
+
+  const staticReleaseKey = `${s3BasePath}/RELEASES`;
+  const staticExeKey = `${s3BasePath}/${appFullName}-Setup.exe`;
+
+  const latestReleaseKey = `${s3BasePath}/${appShortName}-${version}-RELEASES`;
+  const latestExeKey = `${s3BasePath}/${appShortName}-${version}.exe`;
+
+  await deleteFromS3({bucket: bucket, s3Path: staticReleaseKey});
+  await deleteFromS3({bucket: bucket, s3Path: staticExeKey});
+  await copyOnS3({bucket: bucket, s3FromPath: `${bucket}/${latestReleaseKey}`, s3ToPath: staticReleaseKey});
+  await copyOnS3({bucket: bucket, s3FromPath: `${bucket}/${latestExeKey}`, s3ToPath: staticExeKey});
+
+  console.log('Done.');
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});

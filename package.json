@@ -15,6 +15,9 @@
     "@babel/plugin-proposal-object-rest-spread": "7.4.0",
     "@babel/preset-env": "7.4.2",
     "@babel/preset-react": "7.0.0",
+    "@types/form-data": "2.2.1",
+    "@types/fs-extra": "5.0.5",
+    "@types/jszip": "3.1.5",
     "@wireapp/copy-config": "0.5.2",
     "aws-sdk": "2.428.0",
     "babel-core": "7.0.0-bridge.0",
@@ -47,6 +50,7 @@
     "rimraf": "2.6.3",
     "sinon": "7.3.1",
     "style-loader": "0.23.1",
+    "ts-node": "8.0.3",
     "tslint": "5.14.0",
     "tslint-config-prettier": "1.18.0",
     "tslint-plugin-prettier": "2.0.1",
@@ -60,12 +64,12 @@
       "eslint --fix",
       "git add"
     ],
-    "./bin/*.js": [
-      "tsc --allowJs --noEmit",
+    "./bin/*.ts": [
+      "tslint --config tslint.json --project tsconfig.tools.json --fix",
       "git add"
     ],
-    "*.ts": [
-      "tslint --config tslint.json --project tsconfig.json --fix",
+    "electron/**/*.ts": [
+      "tslint --project tsconfig.json --fix",
       "git add"
     ],
     "*.{json,md,css}": [
@@ -96,16 +100,17 @@
     "configure": "copy-config",
     "fix:js": "yarn lint:js --fix",
     "fix:other": "yarn prettier --write",
-    "fix:ts": "yarn lint:ts --fix",
+    "fix:ts": "yarn lint:ts --fix && yarn lint:ts:tools --fix",
     "fix": "yarn fix:js && yarn fix:other && yarn fix:ts",
     "jest": "jest",
     "lint:js": "eslint --ignore-path .gitignore --ext .js,.jsx .",
     "lint:other": "yarn prettier --list-different",
-    "lint:ts": "tslint --config tslint.json --project tsconfig.json \"**/*.ts\"",
+    "lint:ts": "tslint --project tsconfig.json \"electron/**/*.ts\"",
+    "lint:ts:tools": "tslint --project tsconfig.json \"bin/**/*.ts\"",
     "lint": "yarn lint:js && yarn lint:other && yarn lint:ts",
     "postinstall": "yarn configure && cd electron && yarn",
     "prestart": "yarn build:ts && yarn bundle:dev",
-    "prettier": "prettier \"**/*.{json,md,css}\"",
+    "prettier": "prettier \"*.{json,md,css}\"",
     "start:dev": "yarn start --env=https://wire-webapp-dev.zinfra.io",
     "start:edge": "yarn start --env=https://wire-webapp-edge.zinfra.io",
     "start:internal": "yarn start --env=https://wire-webapp-staging.wire.com",

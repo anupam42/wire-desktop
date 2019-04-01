@@ -41,11 +41,7 @@ if (!commander.hockeyToken || !commander.hockeyId || !commander.wrapperBuild || 
   process.exit(1);
 }
 
-/**
- * @param {string} platform
- * @param {string} basePath
- */
-async function getUploadFile(platform, basePath) {
+async function getUploadFile(platform: string, basePath: string) {
   if (platform === 'linux') {
     const debImage = await findDown('.deb', {cwd: basePath});
     return debImage;
@@ -59,33 +55,31 @@ async function getUploadFile(platform, basePath) {
 }
 
 (async () => {
-  try {
-    const {hockeyId, hockeyToken, wrapperBuild} = commander;
-    const [platform, version] = wrapperBuild.toLowerCase().split('#');
-    const searchBasePath = commander.path || path.resolve('.');
+  const {hockeyId, hockeyToken, wrapperBuild} = commander;
+  const [platform, version] = wrapperBuild.toLowerCase().split('#');
+  const searchBasePath = commander.path || path.resolve('.');
 
-    const {filePath} = await getUploadFile(platform, searchBasePath);
+  const {filePath} = await getUploadFile(platform, searchBasePath);
 
-    const zipFile = await zip(filePath, filePath.replace('.exe', '.zip'));
+  const zipFile = await zip(filePath, filePath.replace('.exe', '.zip'));
 
-    const {id: hockeyVersionId} = await createVersion({
-      hockeyAppId: hockeyId,
-      hockeyToken: hockeyToken,
-      version: version,
-    });
+  const {id: hockeyVersionId} = await createVersion({
+    hockeyAppId: hockeyId,
+    hockeyToken: hockeyToken,
+    version: version,
+  });
 
-    await uploadVersion({
-      filePath: zipFile,
-      hockeyAppId: hockeyId,
-      hockeyToken: hockeyToken,
-      hockeyVersionId,
-      version: version,
-    });
+  await uploadVersion({
+    filePath: zipFile,
+    hockeyAppId: hockeyId,
+    hockeyToken: hockeyToken,
+    hockeyVersionId,
+    version: version,
+  });
 
-    await fs.remove(zipFile);
-    console.log('Done.');
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
-  }
-})();
+  await fs.remove(zipFile);
+  console.log('Done.');
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});

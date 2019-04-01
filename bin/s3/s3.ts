@@ -18,12 +18,10 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-//@ts-check
-
-const commander = require('commander');
-const path = require('path');
-const {uploadToS3} = require('./s3-utils');
-const {findDown} = require('../utils');
+import * as commander from 'commander';
+import * as path from 'path';
+import {findDown} from '../utils';
+import {uploadToS3} from './s3-utils';
 
 commander
   .name('s3.js')
@@ -39,12 +37,11 @@ if (!commander.bucket || !commander.wrapperBuild || !commander.wrapperBuild.incl
   process.exit(1);
 }
 
-/**
- * @param {string} platform
- * @param {string} basePath
- * @param {string} version
- */
-async function getUploadFiles(platform, basePath, version) {
+async function getUploadFiles(
+  platform: string,
+  basePath: string,
+  version: string
+): Promise<{filePath: string; fileName: string}[]> {
   if (platform === 'linux') {
     const appImage = await findDown('.AppImage', {cwd: basePath});
     const debImage = await findDown('.deb', {cwd: basePath});
@@ -67,7 +64,11 @@ async function getUploadFiles(platform, basePath, version) {
     const nupkgFile = await findDown('-full.nupkg', {cwd: basePath});
     const releasesFile = await findDown('RELEASES', {cwd: basePath});
 
-    const appShortName = new RegExp('(.+)-[\\d.]+-full\\.nupkg').exec(nupkgFile.fileName)[1];
+    const [, appShortName] = new RegExp('(.+)-[\\d.]+-full\\.nupkg').exec(nupkgFile.fileName);
+
+    if (!appShortName) {
+      throw new Error('App short name not found');
+    }
 
     const setupExeRenamed = {...setupExe, fileName: `${appShortName}-${version}.exe`};
     const releasesRenamed = {...releasesFile, fileName: `${appShortName}-${version}-RELEASES`};
@@ -76,26 +77,26 @@ async function getUploadFiles(platform, basePath, version) {
   } else if (platform === 'macos') {
     const setupPkg = await findDown('.pkg', {cwd: basePath});
     return [setupPkg];
+  } else {
+    throw new Error('Invalid platform');
   }
 }
 
 (async () => {
-  try {
-    const searchBasePath = commander.path || path.join(__dirname, '../../wrap');
-    const s3BasePath = `${commander.s3path || ''}/`;
-    const [platform, version] = commander.wrapperBuild.toLowerCase().split('#');
+  const searchBasePath = commander.path || path.join(__dirname, '../../wrap');
+  const s3BasePath = `${commander.s3path || ''}/`;
+  const [platform, version] = commander.wrapperBuild.toLowerCase().split('#');
 
-    const files = await getUploadFiles(platform, searchBasePath, version);
+  const files = await getUploadFiles(platform, searchBasePath, version);
 
-    for (const file of files) {
-      const {fileName, filePath} = file;
-      const s3Path = `${s3BasePath}${fileName}`.replace('//', '/');
-      await uploadToS3({bucket: commander.bucket, filePath, s3Path});
-    }
-
-    console.log('Done.');
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
+  for (const file of files) {
+    const {fileName, filePath} = file;
+    const s3Path = `${s3BasePath}${fileName}`.replace('//', '/');
+    await uploadToS3({bucket: commander.bucket, filePath, s3Path});
   }
-})();
+
+  console.log('Done.');
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});

@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "lib": ["esnext"],
+    "noEmit": true,
+    "rootDir": "bin",
+    "sourceMap": false
+  },
+  "exclude": ["electron", "node_modules", "wrap"],
+  "extends": "./tsconfig.json"
+}
