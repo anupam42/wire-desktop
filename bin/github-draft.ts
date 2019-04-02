@@ -133,11 +133,11 @@ async function uploadAsset(options: UploadOptions): Promise<void> {
   const [platform, version] = commander.wrapperBuild.toLowerCase().split('#');
   const basePath = commander.path || path.resolve('.');
 
-  if (platform === 'linux') {
+  if (platform.includes('linux')) {
     PLATFORM = 'Linux';
-  } else if (platform === 'windows') {
+  } else if (platform.includes('windows')) {
     PLATFORM = 'Windows';
-  } else if (platform === 'macos') {
+  } else if (platform.includes('macos')) {
     PLATFORM = 'macOS';
   } else {
     throw new Error('Invalid platform');

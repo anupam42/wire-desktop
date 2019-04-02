@@ -42,7 +42,7 @@ async function getUploadFiles(
   basePath: string,
   version: string
 ): Promise<{filePath: string; fileName: string}[]> {
-  if (platform === 'linux') {
+  if (platform.includes('linux')) {
     const appImage = await findDown('.AppImage', {cwd: basePath});
     const debImage = await findDown('.deb', {cwd: basePath});
     const repositoryFiles = [
@@ -59,7 +59,7 @@ async function getUploadFiles(
     ].map(fileName => ({fileName, filePath: path.join(basePath, fileName)}));
 
     return [...repositoryFiles, appImage, debImage];
-  } else if (platform === 'windows') {
+  } else if (platform.includes('windows')) {
     const setupExe = await findDown('-Setup.exe', {cwd: basePath});
     const nupkgFile = await findDown('-full.nupkg', {cwd: basePath});
     const releasesFile = await findDown('RELEASES', {cwd: basePath});
@@ -74,7 +74,7 @@ async function getUploadFiles(
     const releasesRenamed = {...releasesFile, fileName: `${appShortName}-${version}-RELEASES`};
 
     return [nupkgFile, releasesRenamed, setupExeRenamed];
-  } else if (platform === 'macos') {
+  } else if (platform.includes('macos')) {
     const setupPkg = await findDown('.pkg', {cwd: basePath});
     return [setupPkg];
   } else {

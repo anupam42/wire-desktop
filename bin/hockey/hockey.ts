@@ -18,12 +18,12 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
-import * as path from 'path';
-import * as fs from 'fs-extra';
 import * as commander from 'commander';
+import * as fs from 'fs-extra';
+import * as path from 'path';
 
+import {FindResult, findDown} from '../utils';
 import {createVersion, uploadVersion, zip} from './hockey-utils';
-import {findDown, FindResult} from '../utils';
 
 commander
   .name('hockey.js')
@@ -40,17 +40,17 @@ if (!commander.hockeyToken || !commander.hockeyId || !commander.wrapperBuild || 
 }
 
 async function getUploadFile(platform: string, basePath: string): Promise<FindResult> {
-  if (platform === 'linux') {
+  if (platform.includes('linux')) {
     const debImage = await findDown('.deb', {cwd: basePath});
     return debImage;
-  } else if (platform === 'windows') {
+  } else if (platform.includes('windows')) {
     const setupExe = await findDown('-Setup.exe', {cwd: basePath});
     return setupExe;
-  } else if (platform === 'macos') {
+  } else if (platform.includes('macos')) {
     const setupPkg = await findDown('.pkg', {cwd: basePath});
     return setupPkg;
   } else {
-    throw new Error('Invalid platform')
+    throw new Error('Invalid platform');
   }
 }
 
