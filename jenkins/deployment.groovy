@@ -164,9 +164,7 @@ node('master') {
               sh "node ./bin/s3/s3-releases.js -b ${BUCKET} -s Windows -s win/prod -w ${WRAPPER_BUILD} -p ./wrap/"
             }
           } else if (params.Release.equals('Custom')) {
-            withCredentials([string(credentialsId: "${AWS_CUSTOM_ACCESS_KEY_ID}", variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: "${AWS_CUSTOM_SECRET_ACCESS_KEY}", variable: 'AWS_SECRET_ACCESS_KEY')]) {
-              sh "npx ts-node -P tsconfig.tools.json ./bin/s3/s3-releases.ts -b ${WIN_S3_BUCKET} -s Windows -s ${WIN_S3_PATH} -w ${WRAPPER_BUILD} -p ./wrap/"
-            }
+            // do nothing
           } else {
             withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
               sh "node ./bin/s3/s3-releases.js -b ${BUCKET} -s Windows -s win/internal -w ${WRAPPER_BUILD} -p ./wrap/"
